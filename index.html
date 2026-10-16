@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Maligon — лаунчер и сервер</title>
+<link rel="icon" type="image/png" href="assets/mlg.png">
+<style>
+:root{color-scheme:dark;--bg:#050507;--card:rgba(14,14,18,.68);--line:rgba(255,255,255,.09);--fg:#ededed;--mut:#a1a1aa;--accent:#5865f2;--glow:#50e3c2;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;scroll-behavior:smooth}
+body{min-height:100dvh;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:16px/1.6 Geist,Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative}
+a{color:inherit}
+
+/* --- PARALLAX BACKGROUND --- */
+.parallax-wrap{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;perspective:1000px}
+.p-layer{position:absolute;inset:-8%;will-change:transform;transition:transform .12s cubic-bezier(.2,.8,.2,1)}
+
+/* Слой 1: Глубокие световые пятна */
+.orb{position:absolute;border-radius:50%;filter:blur(95px);opacity:.4;animation:pulse 10s ease-in-out infinite alternate}
+.orb-1{width:520px;height:520px;background:radial-gradient(circle,var(--accent),transparent 70%);top:-12%;left:12%}
+.orb-2{width:460px;height:460px;background:radial-gradient(circle,var(--glow),transparent 70%);bottom:-15%;right:10%;animation-delay:-5s;opacity:.25}
+.orb-3{width:340px;height:340px;background:radial-gradient(circle,#9b51e0,transparent 70%);top:38%;left:52%;transform:translate(-50%,-50%);opacity:.22}
+
+/* Слой 2: Перспективная сетка */
+.bg-grid{
+  background-size:56px 56px;
+  background-image:
+    linear-gradient(to right,rgba(255,255,255,.035) 1px,transparent 1px),
+    linear-gradient(to bottom,rgba(255,255,255,.035) 1px,transparent 1px);
+  mask-image:radial-gradient(ellipse 75% 65% at 50% 45%,#000 15%,transparent 100%);
+  -webkit-mask-image:radial-gradient(ellipse 75% 65% at 50% 45%,#000 15%,transparent 100%);
+}
+
+/* Слой 3: Canvas для частиц */
+#particles{width:100%;height:100%;display:block}
+
+@keyframes pulse{
+  0%{transform:scale(1) translate(0,0)}
+  100%{transform:scale(1.12) translate(25px,-20px)}
+}
+
+/* --- ОСНОВНОЙ КОНТЕНТ --- */
+.wrap{position:relative;z-index:1;width:100%;max-width:960px;margin:0 auto;padding:0 20px;flex:1;display:flex;flex-direction:column;justify-content:space-between}
+nav{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+nav .links{display:flex;gap:20px;font-size:14px;color:var(--mut)}
+nav a{text-decoration:none;transition:color .2s}nav a:hover{color:var(--fg)}
+.nav-icon{height:36px;width:auto;display:block;filter:drop-shadow(0 0 12px rgba(255,255,255,.15))}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:48px;padding:24px 0}
+.hero{text-align:center}
+.logo{width:100%;max-width:460px;height:auto;display:inline-block;filter:drop-shadow(0 12px 32px rgba(0,0,0,.65));transition:transform .3s ease}
+.logo:hover{transform:scale(1.02)}
+.cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:32px}
+.btn{height:48px;padding:0 30px;border-radius:10px;border:1px solid #333;background:rgba(255,255,255,.04);color:var(--fg);font:500 15px inherit;font-family:inherit;display:inline-flex;align-items:center;gap:10px;text-decoration:none;cursor:pointer;transition:all .22s ease}
+.btn:hover{transform:translateY(-2px)}
+.btn.p{background:#ededed;color:#000;border-color:#ededed;box-shadow:0 8px 28px rgba(255,255,255,.16)}
+.btn.p:hover{background:#fff;box-shadow:0 12px 34px rgba(255,255,255,.26)}
+.btn.d{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 8px 28px rgba(88,101,242,.32)}
+.btn.d:hover{background:#6b77f5;box-shadow:0 12px 34px rgba(88,101,242,.48)}
+.btn svg{width:20px;height:20px;fill:currentColor}
+h2{font-size:28px;letter-spacing:-.03em;font-weight:600}
+.discord{text-align:center;background:var(--card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:18px;padding:42px 20px;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.discord p{color:var(--mut);margin:8px auto 24px;max-width:460px}
+footer{padding:24px 0;text-align:center;color:var(--mut);font-size:13px}
+.toast{position:fixed;z-index:10;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:rgba(17,17,22,.9);backdrop-filter:blur(10px);border:1px solid #333;border-radius:8px;padding:10px 16px;font-size:13px;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style></head><body>
+
+<!-- Многослойный Parallax-фон -->
+<div class="parallax-wrap" aria-hidden="true">
+  <div class="p-layer" data-depth="0.025">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <div class="p-layer bg-grid" data-depth="0.05"></div>
+  <div class="p-layer" data-depth="0.09">
+    <canvas id="particles"></canvas>
+  </div>
+</div>
+
+<div class="wrap">
+<nav>
+  <div class="links"><a href="#discord">Discord</a></div>
+  <img class="nav-icon" src="assets/mlg.png" alt="Maligon">
+</nav>
+
+<main>
+  <header class="hero">
+    <img class="logo" alt="Maligon" src="assets/logo.png">
+    <div class="cta">
+      <a class="btn p" id="dl" href="https://github.com/Feylons/Maligon-Launcher/releases/latest">Скачать лаунчер для Windows</a>
+    </div>
+  </header>
+
+  <section id="discord">
+    <div class="discord">
+      <h2>Присоединяйся к Discord</h2>
+      <p>Новости проекта, помощь по запуску и общение с игроками.</p>
+      <a class="btn d" href="https://discord.gg/TsV8JtQtz5" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.2.5a18 18 0 0 0-6.4 0L8.6 3a19.7 19.7 0 0 0-4.9 1.4C.6 9 -.2 13.5.2 18a19.9 19.9 0 0 0 6 3l1.3-2.1c-.7-.2-1.4-.6-2-1l.5-.4a14.2 14.2 0 0 0 12 0l.5.4c-.6.4-1.3.8-2 1L17.8 21a19.8 19.8 0 0 0 6-3c.5-5.2-.8-9.700-3.500-13.600ZM8.500 15.300c-1.200 0-2.100-1.100-2.100-2.400s.9-2.400 2.100-2.400 2.100 1.100 2.100 2.400-.9 2.400-2.100 2.400Zm7 0c-1.200 0-2.100-1.100-2.100-2.400s.9-2.400 2.100-2.400 2.100 1.100 2.100 2.400-.9 2.400-2.100 2.400Z"/></svg>
+        Открыть Discord
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer>© Maligon · Проект не связан с Rockstar Games и Take-Two Interactive.</footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// 1. Получение ссылки на последний setup.exe из GitHub Releases
+var dl = document.getElementById('dl');
+var t = document.getElementById('toast');
+
+function toast(m){
+  t.textContent = m;
+  t.classList.add('show');
+  clearTimeout(toast.h);
+  toast.h = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
+
+fetch("https://api.github.com/repos/Feylons/Maligon-Launcher/releases/latest")
+  .then(function(res) {
+    if (!res.ok) throw new Error("Не удалось загрузить данные о релизе");
+    return res.json();
+  })
+  .then(function(data) {
+    if (data.assets && data.assets.length > 0) {
+      var exeAsset = data.assets.find(function(a) {
+        return a.name.toLowerCase().includes("setup") && a.name.toLowerCase().endsWith(".exe");
+      }) || data.assets.find(function(a) {
+        return a.name.toLowerCase().endsWith(".exe");
+      });
+
+      if (exeAsset && exeAsset.browser_download_url) {
+        dl.href = exeAsset.browser_download_url;
+      }
+    }
+  })
+  .catch(function(err) {
+    console.warn("Ошибка при получении ссылки на setup.exe:", err);
+  });
+
+// 2. Движок Parallax-слоев и частиц
+(function() {
+  var layers = document.querySelectorAll('.p-layer');
+  var targetX = 0, targetY = 0, curX = 0, curY = 0;
+
+  window.addEventListener('mousemove', function(e) {
+    targetX = (e.clientX - window.innerWidth / 2);
+    targetY = (e.clientY - window.innerHeight / 2);
+  });
+
+  // Поддержка гироскопа на мобильных устройствах
+  window.addEventListener('deviceorientation', function(e) {
+    if (e.gamma !== null && e.beta !== null) {
+      targetX = e.gamma * 15;
+      targetY = (e.beta - 45) * 15;
+    }
+  });
+
+  // Инициализация частиц на Canvas
+  var canvas = document.getElementById('particles');
+  var ctx = canvas.getContext('2d');
+  var w, h, stars = [];
+
+  function resize() {
+    w = canvas.width = window.innerWidth * 1.16;
+    h = canvas.height = window.innerHeight * 1.16;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  for (var i = 0; i < 65; i++) {
+    stars.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: Math.random() * 1.8 + 0.4,
+      alpha: Math.random() * 0.65 + 0.15,
+      speedY: -(Math.random() * 0.35 + 0.08),
+      speedX: (Math.random() - 0.5) * 0.2,
+      factor: Math.random() * 0.6 + 0.4
+    });
+  }
+
+  function animate() {
+    curX += (targetX - curX) * 0.07;
+    curY += (targetY - curY) * 0.07;
+
+    for (var i = 0; i < layers.length; i++) {
+      var depth = parseFloat(layers[i].getAttribute('data-depth'));
+      var moveX = -curX * depth;
+      var moveY = -curY * depth;
+      layers[i].style.transform = 'translate3d(' + moveX.toFixed(2) + 'px,' + moveY.toFixed(2) + 'px,0)';
+    }
+
+    ctx.clearRect(0, 0, w, h);
+    for (var j = 0; j < stars.length; j++) {
+      var s = stars[j];
+      s.y += s.speedY;
+      s.x += s.speedX;
+
+      if (s.y < 0) s.y = h;
+      if (s.x < 0) s.x = w;
+      if (s.x > w) s.x = 0;
+
+      var drawX = s.x - curX * 0.03 * s.factor;
+      var drawY = s.y - curY * 0.03 * s.factor;
+
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 255, 255, ' + s.alpha + ')';
+      ctx.fill();
+    }
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+</script>
+</body></html>
